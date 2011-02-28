@@ -35,6 +35,10 @@ class CounterPlugin extends GenericPlugin {
 			$this->import('CounterReportDAO');
 			$counterReportDao = new CounterReportDAO();
 			DAORegistry::registerDAO('CounterReportDAO', $counterReportDao);
+
+			$this->import('SushiServiceDAO');
+			$sushiServiceDAO = new SushiServiceDAO();
+			DAORegistry::registerDAO('SushiServiceDAO', $sushiServiceDAO);
 		}
 		return $success;
 	}
@@ -55,7 +59,7 @@ class CounterPlugin extends GenericPlugin {
 	}
 
 	function displayMenuOption($hookName, $args) {
-		if (!Validation::isSiteAdmin()) return false;
+		if (!Validation::isJournalManager()) return false;
 
 		$params =& $args[0];
 		$smarty =& $args[1];

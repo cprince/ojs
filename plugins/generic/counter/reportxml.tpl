@@ -19,8 +19,8 @@
       <WebSiteUrl>{$base_url|escape:"html"}</WebSiteUrl>
     </Vendor>
     <Customer>
-      <Name>{$reqUser->getUserName()|escape:"html"}</Name>
-      <ID>{$reqUser->getUserID()|escape:"html"}</ID>
+      <Name>{$userName|escape:"html"}</Name>
+      <ID>{$userID|escape:"html"}</ID>
 
       {foreach from=$journalsArray key=journalkey item=journal}
 

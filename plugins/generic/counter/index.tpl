@@ -17,6 +17,7 @@
   <li>&#187; {translate key="plugins.generic.counter.1a.title"}{foreach from=$years item=year}&nbsp;&nbsp;<a href="{url op="report" year=$year}">{$year|escape}</a>{/foreach}</li>
   <li>&#187; XML version {foreach from=$years item=year}&nbsp;&nbsp;<a href="{url op="reportxml" year=$year}">{$year|escape}</a>{/foreach}</li>
   <li>&#187; SUSHI SOAP endpoint: sushixml</li>
+  <li>&#187; <a href="{url op="synergiesOptIn"}">Sign up</a> for COUNTER harvesting via SUSHI</li>
   {call_hook name="Template::Plugin::Generic::Counter::Index"}
 </ul>
 

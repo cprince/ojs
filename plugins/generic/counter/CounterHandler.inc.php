@@ -66,13 +66,16 @@ class CounterHandler extends Handler {
 	/**
 	* Internal function to assign information for the Counter part of a report
 	*/
-	function _assignTemplateCounterXML($templateManager, $begin, $end='') {
-		$journal =& Request::getJournal();
-		
+	function _assignTemplateCounterXML($templateManager, $journalId, $userName, $userID, $begin, $end='') {
 		$counterReportDao =& DAORegistry::getDAO('CounterReportDAO');
 
 		$journalDao =& DAORegistry::getDAO('JournalDAO');
-		$journalIds = $counterReportDao->getJournalIds();
+
+		if (Validation::isSiteAdmin()) {
+			$journalIds = $counterReportDao->getJournalIds();
+		} else {
+			$journalIds[0] = $journalId;
+		}
 
 		if ($end == '') $end = $begin;
 
@@ -96,11 +99,10 @@ class CounterHandler extends Handler {
 
 		$base_url =& Config::getVar('general','base_url');
 
-		$reqUser =& Request::getUser();
-		$templateManager->assign_by_ref('reqUser', $reqUser);
-
 		$templateManager->assign_by_ref('journalsArray', $journalsArray);
 
+		$templateManager->assign('userName', $userName);
+		$templateManager->assign('userID', $userID);
 		$templateManager->assign('siteTitle', $siteTitle);
 		$templateManager->assign('base_url', $base_url);
 	}
@@ -118,12 +120,39 @@ class CounterHandler extends Handler {
 
 		$year = Request::getUserVar('year');
 
+		$journalId = Request::getJournal()->getJournalId();
+
 		$begin = "$year-01-01";
 		$end = "$year-12-01";
 
-		$this->_assignTemplateCounterXML($templateManager, $begin, $end);
+		$reqUser =& Request::getUser();
+		$userName = $reqUser->getUserName();
+		$userID = $reqUser->getUserID();
+
+		$this->_assignTemplateCounterXML($templateManager, $journalId, $userName, $userID, $begin, $end);
 
 		$templateManager->display($plugin->getTemplatePath() . 'reportxml.tpl', 'text/xml');
+	}
+
+
+	/**
+	* Opt in to Synergies SUSHI harvesting
+	*/
+	function synergiesOptIn() {
+		$this->validate();
+		$plugin =& $this->plugin;
+		$this->setupTemplate(true);
+		$errors = '';
+
+		$templateManager =& TemplateManager::getManager();
+
+		$journalId = Request::getJournal()->getJournalId();
+
+		$sushiServiceDAO =& DAORegistry::getDAO('SushiServiceDAO');
+		$sushiServiceDAO->requestSynergiesService($journalId, $errors);
+
+		$templateManager->assign('errors', $errors);
+		$templateManager->display($plugin->getTemplatePath() . 'synergiesoptin.tpl');
 	}
 
 
@@ -131,7 +160,7 @@ class CounterHandler extends Handler {
 	* SUSHI report
 	*/
 	function sushiXML() {
-		$this->validate();
+		$this->validate(true);
 		$plugin =& $this->plugin;
 		$this->setupTemplate(true);
 
@@ -195,7 +224,12 @@ class CounterHandler extends Handler {
 			$usageDateEnd = $usageDateRange->getChildByName($sushiPrefix.'End')->getValue();
 
 
-			CounterHandler::_assignTemplateCounterXML($templateManager, $usageDateBegin, $usageDateEnd);
+			$journalId = Request::getJournal()->getJournalId();
+
+			$userName = 'SushiUser';
+			$userID = 'SushiID';
+
+			$this->_assignTemplateCounterXML($templateManager, $journalId, $userName, $userID, $begin, $end);
 
 			$templateManager->assign('requestorID', $requestorID);
 			$templateManager->assign('requestorName', $requestorName);
@@ -281,20 +315,30 @@ class CounterHandler extends Handler {
 		fputcsv($fp, $cols);
 
 		// Display the totals first
-		$totals = $counterReportDao->getMonthlyTotalRange($begin, $end);
-		$cols = array(
-			Locale::translate('plugins.generic.counter.1a.totalForAllJournals'),
-			'-', // Publisher
-			'', // Platform
-			'-',
-			'-'
-		);
-		CounterHandler::_formColumns($cols, $totals);
-		fputcsv($fp, $cols);
+		if (Validation::isSiteAdmin()) {
+			$totals = $counterReportDao->getMonthlyTotalRange($begin, $end);
+			$cols = array(
+				Locale::translate('plugins.generic.counter.1a.totalForAllJournals'),
+				'-', // Publisher
+				'', // Platform
+				'-',
+				'-'
+			);
+			CounterHandler::_formColumns($cols, $totals);
+			fputcsv($fp, $cols);
+		}
 
 		// Get statistics from the log.
 		$journalDao =& DAORegistry::getDAO('JournalDAO');
-		$journalIds = $counterReportDao->getJournalIds();
+
+		$journalId = Request::getJournal()->getJournalId();
+
+		if (Validation::isSiteAdmin()) {
+			$journalIds = $counterReportDao->getJournalIds();
+		} else {
+			$journalIds[0] = $journalId;
+		}
+
 		foreach ($journalIds as $journalId) {
 			$journal =& $journalDao->getJournal($journalId);
 			if (!$journal) continue;
@@ -315,20 +359,36 @@ class CounterHandler extends Handler {
 	}
 
 	/**
-	 * Validate that user has site admin privileges or journal manager priveleges.
+	 * Validate that user has manager privileges or this is a SUSHI request
 	 * Redirects to the user index page if not properly authenticated.
-	 * @param $canRedirect boolean Whether or not to redirect if the user cannot be validated; if not, the script simply terminates.
+	 * @param $sushiRequest boolean Authenticate as a machine request instead of using normal authentication.
 	 */
-	function validate($canRedirect = true) {
+	function validate($sushiRequest = false) {
 		parent::validate();
 		$journal =& Request::getJournal();
-		if (!Validation::isSiteAdmin()) {
-			if ($canRedirect) Validation::redirectLogin();
-			else exit;
-		}
-
+		$journal_id = $journal->getJournalId();
 		$plugin =& Registry::get('plugin');
 		$this->plugin =& $plugin;
+
+		$sushiServiceDAO =& DAORegistry::getDAO('SushiServiceDAO');
+
+		if ($sushiRequest) {
+			$sessionManager =& SessionManager::getManager();
+			$session =& $sessionManager->getUserSession();
+			if (!$sushiServiceDAO->checkService($journal_id, $session->getIpAddress())) {
+				$templateManager =& TemplateManager::getManager();
+				$templateManager->assign('Faultcode', 'Client');
+				$templateManager->assign('Faultstring', 'Unauthorized.');
+				header("HTTP/1.0 500 Internal Server Error");
+				$templateManager->display($plugin->getTemplatePath() . 'soaperror.tpl', 'text/xml');
+				exit();
+				return false;
+			}
+		} else {
+			if (!Validation::isJournalManager()) {
+				Validation::redirectLogin();
+			}
+		}
 		return true;
 	}
 

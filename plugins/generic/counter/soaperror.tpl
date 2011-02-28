@@ -17,5 +17,5 @@
       <Faultcode>{$Faultcode}</Faultcode>
       <Faultstring>{$Faultstring}</Faultstring>
     </SOAP-ENV:Fault>
-</SOAP-ENV:Body>
+  </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>

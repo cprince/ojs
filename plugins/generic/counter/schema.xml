@@ -47,4 +47,33 @@
       <UNIQUE/>
     </index>
   </table>
+
+  <!--
+   *
+   * TABLE sushi_service
+   *
+   -->
+  <table name="sushi_service">
+    <field name="id" type="I8">
+      <AUTOINCREMENT/>
+      <KEY/>
+    </field>
+    <field name="journal_id" type="I8">
+      <NOTNULL/>
+    </field>
+    <field name="date_modified" type="T">
+      <NOTNULL/>
+    </field>
+    <field name="service_name" type="C2" size="100">
+      <NOTNULL />
+    </field>
+    <field name="service_id" type="C2" size="50">
+      <NOTNULL />
+    </field>
+    <field name="ip_address" type="C2" size="50">
+      <NOTNULL />
+    </field>
+     <descr>SUSHI service authority</descr>
+  </table>
+
 </schema>
